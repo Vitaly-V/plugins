@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:ui' show hashValues;
 import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
@@ -34,10 +35,14 @@ class SKPaymentQueueWrapper {
     return _singleton;
   }
 
-  static final SKPaymentQueueWrapper _singleton = new SKPaymentQueueWrapper._();
+  static final SKPaymentQueueWrapper _singleton = SKPaymentQueueWrapper._();
 
-  SKPaymentQueueWrapper._() {
-    callbackChannel.setMethodCallHandler(_handleObserverCallbacks);
+  SKPaymentQueueWrapper._();
+
+  /// Calls [`-[SKPaymentQueue transactions]`](https://developer.apple.com/documentation/storekit/skpaymentqueue/1506026-transactions?language=objc)
+  Future<List<SKPaymentTransactionWrapper>> transactions() async {
+    return _getTransactionList(
+        await channel.invokeListMethod<Map>('-[SKPaymentQueue transactions]'));
   }
 
   /// Calls [`-[SKPaymentQueue canMakePayments:]`](https://developer.apple.com/documentation/storekit/skpaymentqueue/1506139-canmakepayments?language=objc).
@@ -52,6 +57,7 @@ class SKPaymentQueueWrapper {
   /// addTransactionObserver:]`](https://developer.apple.com/documentation/storekit/skpaymentqueue/1506042-addtransactionobserver?language=objc).
   void setTransactionObserver(SKTransactionObserverWrapper observer) {
     _observer = observer;
+    callbackChannel.setMethodCallHandler(_handleObserverCallbacks);
   }
 
   /// Posts a payment to the queue.
@@ -99,7 +105,7 @@ class SKPaymentQueueWrapper {
       SKPaymentTransactionWrapper transaction) async {
     await channel.invokeMethod<void>(
         '-[InAppPurchasePlugin finishTransaction:result:]',
-        transaction.transactionIdentifier);
+        transaction.payment.productIdentifier);
   }
 
   /// Restore previously purchased transactions.
@@ -236,6 +242,9 @@ class SKError {
         DeepCollectionEquality.unordered()
             .equals(typedOther.userInfo, userInfo);
   }
+
+  @override
+  int get hashCode => hashValues(this.code, this.domain, this.userInfo);
 }
 
 /// Dart wrapper around StoreKit's
@@ -326,6 +335,14 @@ class SKPaymentWrapper {
         typedOther.simulatesAskToBuyInSandbox == simulatesAskToBuyInSandbox &&
         typedOther.requestData == requestData;
   }
+
+  @override
+  int get hashCode => hashValues(
+      this.productIdentifier,
+      this.applicationUsername,
+      this.quantity,
+      this.simulatesAskToBuyInSandbox,
+      this.requestData);
 
   @override
   String toString() => _$SKPaymentWrapperToJson(this).toString();
